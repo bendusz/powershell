@@ -1,3 +1,4 @@
+#Requires -Version 5
 <#
 .SYNOPSIS
     This script is used to activate virtual machines running on a Hyper-V host using the Automatic Virtual Machine Activation (AVMA) key.
@@ -9,7 +10,7 @@
     This script automates the activation process for virtual machines running on a Hyper-V host using the Automatic Virtual Machine Activation (AVMA) key.
     The script first checks the Windows edition of the virtual machine and then installs the appropriate AVMA key to activate Windows.
     The AVMA key is specific to the Windows Server version and edition, and it is used to activate virtual machines running on a Hyper-V host without the need for individual keys.
-    The script supports Windows Server 2016, 2019, 2022 and 2025 Standard andDatacenter editions.
+    The script supports Windows Server 2016, 2019, 2022 and 2025 Standard and Datacenter editions.
     Note: This script requires administrative privileges to install the AVMA key and activate Windows.
 .PARAMETER <Parameter_Name>
     None
@@ -18,7 +19,7 @@
 .OUTPUTS
     None
 .NOTES
-  Version:        1.0
+  Version:        1.1
   Author:         Bendusz
   Creation Date:  19/02/2025
   Purpose/Change: Streamlining the activation process using AVMA key.
@@ -46,7 +47,7 @@ Write-Host "Checking current activation status..."
 $initialStatus = Get-ActivationStatus
 if ($initialStatus -match "activated") {
     Write-Host "System is already activated. Exiting." -ForegroundColor Green
-    exit
+    exit 0 # Exit code 0 for success (already activated)
 }
 
 # Retrieve OS information.
@@ -54,27 +55,27 @@ $osInfo = Get-CimInstance -ClassName Win32_OperatingSystem
 $caption = $osInfo.Caption
 Write-Host "Detected OS: $caption"
 
-# Determine the appropriate AVMA key based on the OS version and edition.
+# Determine the appropriate AVMA key based on the OS version and edition using a switch statement.
 $avmaKey = $null
-if ($caption -match "2016" -and $caption -match "Standard") {
-    $avmaKey = "BCR9J-3M3YR-9WYR8-RKQBV-3VQ8B"
-} elseif ($caption -match "2016" -and $caption -match "Datacenter") {
-    $avmaKey = "TMJ3Y-NTRTM-FJYXT-T22BY-CWG3J"
-} elseif ($caption -match "2019" -and $caption -match "Standard") {
-    $avmaKey = "N69G4-B89J2-4G8F4-WWYCC-J464C"
-} elseif ($caption -match "2019" -and $caption -match "Datacenter") {
-    $avmaKey = "WMDGN-G9PQG-XVVXX-R3X43-63DFG"
-} elseif ($caption -match "2022" -and $caption -match "Standard") {
-    $avmaKey = "N2KJX-J94YW-TQVFB-DG9YT-724CC"
-} elseif ($caption -match "2022" -and $caption -match "Datacenter") {
-    $avmaKey = "B69WH-PRNHK-BXVK3-P9XF7-XD84C"
-} elseif ($caption -match "2025" -and $caption -match "Standard") {
-    $avmaKey = "WWVGQ-PNHV9-B89P4-8GGM9-9HPQ4"
-} elseif ($caption -match "2025" -and $caption -match "Datacenter") {
-    $avmaKey = "YQB4H-NKHHJ-Q6K4R-4VMY6-VCH67"
-} else {
-    Write-Host "Unsupported Windows Server version or edition. Exiting."
-    exit
+switch -Wildcard ($caption) {
+    "*2016*Standard*"   { $avmaKey = "BCR9J-3M3YR-9WYR8-RKQBV-3VQ8B" }
+    "*2016*Datacenter*" { $avmaKey = "TMJ3Y-NTRTM-FJYXT-T22BY-CWG3J" }
+    "*2019*Standard*"   { $avmaKey = "N69G4-B89J2-4G8F4-WWYCC-J464C" }
+    "*2019*Datacenter*" { $avmaKey = "WMDGN-G9PQG-XVVXX-R3X43-63DFG" }
+    "*2022*Standard*"   { $avmaKey = "N2KJX-J94YW-TQVFB-DG9YT-724CC" }
+    "*2022*Datacenter*" { $avmaKey = "B69WH-PRNHK-BXVK3-P9XF7-XD84C" }
+    "*2025*Standard*"   { $avmaKey = "WWVGQ-PNHV9-B89P4-8GGM9-9HPQ4" }
+    "*2025*Datacenter*" { $avmaKey = "YQB4H-NKHHJ-Q6K4R-4VMY6-VCH67" }
+    default {
+        Write-Host "Unsupported Windows Server version or edition: $caption. Exiting." -ForegroundColor Yellow
+        exit 1 # Exit code 1 for failure (unsupported OS)
+    }
+}
+
+# Check if a key was found (though 'default' in switch should handle this)
+if ($null -eq $avmaKey) {
+    Write-Host "Could not determine AVMA key for OS: $caption. Exiting." -ForegroundColor Red
+    exit 1 # Exit code 1 for failure (logic error or unexpected caption)
 }
 
 Write-Host "Using AVMA key: $avmaKey"
@@ -96,6 +97,8 @@ Write-Host $finalStatus
 
 if ($finalStatus -match "activated") {
     Write-Host "Activation successful!" -ForegroundColor Green
+    exit 0 # Exit code 0 for success
 } else {
     Write-Host "Activation failed. Please review the output above." -ForegroundColor Red
+    exit 1 # Exit code 1 for failure
 }
